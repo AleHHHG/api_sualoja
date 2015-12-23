@@ -19,14 +19,12 @@ $loader->registerDirs(
 )->register();
 
 
-
 $di->set('collectionManager', function(){
     return new Phalcon\Mvc\Collection\Manager();
 }, true);
 
 
 function setDatabase($di,$host,$db){ 
-// This service returns a mongo database at localhost
     $di->set(
         'api_db',
         function () use ($host,$db) {
@@ -63,7 +61,6 @@ function setProduto($obj){
     }else{
         return true;
     }
-    //$p->save();
 }
 
 
@@ -117,7 +114,7 @@ $app->get('/products/{key}',function($key) use($app,$di){
 });
 
 
-// Retorna todos os produtos cadastrados na loja
+// Retorna um produto especifo cadastrado na loja
 $app->get('/product/{key}/{codigo}',function($key,$codigo) use($app,$di){
     $response = new Response();
     $conta = Contas::findFirst(array('conditions' => array('key' => $key)));
@@ -247,7 +244,6 @@ $app->post('/create/account', function () use ($app) {
 });
 
 // Update Product
-
 $app->post('/update/product/{key}/{codigo}', function ($key,$codigo) use ($app,$di) {
     $response = new Response();
     $conta = Contas::findFirst(array('conditions' => array('key' => $key)));
