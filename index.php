@@ -24,6 +24,17 @@ $di->set('collectionManager', function(){
 }, true);
 
 
+$di->set(
+    'api_contas',
+    function () {
+        $mongo = new MongoClient("mongodb://localhost");
+
+        return $mongo->selectDB("api_contas");
+    },
+    true
+);
+
+
 function setDatabase($di,$host,$db){ 
     $di->set(
         'api_db',
@@ -63,7 +74,6 @@ function setProduto($obj){
     }
 }
 
-
 $app->get('/', function () {
     echo "<h1>Api Sualoja.online!</h1>";
 });
@@ -71,11 +81,13 @@ $app->get('/', function () {
 // Retorna todos os produtos cadastrados na loja
 $app->get('/products/{key}',function($key) use($app,$di){
     $response = new Response();
+    $response->setHeader('Content-Type', 'application/xml');
     $conta = Contas::findFirst(array('conditions' => array('key' => $key)));
     if($conta){
         setDatabase($di,$conta->host,$conta->database);
         $dados = Produtos::find();
-        $xml = new SimpleXMLElement("<?xml version='1.0' encoding='ISO-8859-1'?> <items/>");
+        $xml = new SimpleXMLElement("<?xml version='1.0' encoding='ISO-8859-1'?><response/>");
+        $xml->addChild('status','OK');
         foreach ($dados as $key => $value) {
             $produto = $xml->addChild('produtos');
             $produto->addChild('codigo',$value->sku);
@@ -95,20 +107,10 @@ $app->get('/products/{key}',function($key) use($app,$di){
 
         }
         $response->setStatusCode(200, 'OK');
-        $response->setJsonContent(
-            array(
-                'status' => 'OK',
-                'response'   => array('produtos' => $xml->asXml()),
-            )
-        );
+        $response->setContent($xml->asXml());
     }else{
         $response->setStatusCode(401, 'Não autorizado');
-        $response->setJsonContent(
-            array(
-                'status' => 'Error',
-                'response'   => array('Chave invalida'),
-            )
-        );
+        $response->setContent("<?xml version='1.0' encoding='ISO-8859-1'?><response><status>ERROR</status><mensagem>Chave inválida</mensagem></response>");
     }
     return $response;
 });
@@ -117,6 +119,7 @@ $app->get('/products/{key}',function($key) use($app,$di){
 // Retorna um produto especifo cadastrado na loja
 $app->get('/product/{key}/{codigo}',function($key,$codigo) use($app,$di){
     $response = new Response();
+    $response->setHeader('Content-Type', 'application/xml');
     $conta = Contas::findFirst(array('conditions' => array('key' => $key)));
     if($conta){
         setDatabase($di,$conta->host,$conta->database);
@@ -126,7 +129,8 @@ $app->get('/product/{key}/{codigo}',function($key,$codigo) use($app,$di){
                 )
             );
         if($dados){
-            $xml = new SimpleXMLElement("<?xml version='1.0' encoding='ISO-8859-1'?> <item/>");
+            $xml = new SimpleXMLElement("<?xml version='1.0' encoding='ISO-8859-1'?> <response/>");
+            $xml->addChild('status','OK');
             $xml->addChild('codigo',$dados->sku);
             $xml->addChild('nome',$dados->nome);
             $xml->addChild('categoria',$dados->categoria);
@@ -142,29 +146,14 @@ $app->get('/product/{key}/{codigo}',function($key,$codigo) use($app,$di){
             $cubagem->addChild('largura',$dados->largura);
             $cubagem->addChild('comprimento',$dados->comprimento);
             $response->setStatusCode(200, 'OK');
-            $response->setJsonContent(
-                array(
-                    'status' => 'OK',
-                    'response'   => array('produto' => $xml->asXml()),
-                )
-            );
+            $response->setContent($xml->asXml());
         }else{
             $response->setStatusCode(200, 'OK');
-            $response->setJsonContent(
-                array(
-                    'status' => 'Error',
-                    'response'   => array('Nenhum produto encontrado'),
-                )
-            );  
+            $response->setContent("<?xml version='1.0' encoding='ISO-8859-1'?><response><status>ERROR</status><mensagem>Produto cod. $codigo não encontrado</mensagem></response>");
         }
     }else{
         $response->setStatusCode(401, 'Não autorizado');
-        $response->setJsonContent(
-            array(
-                'status' => 'Error',
-                'response'   => array('Chave invalida'),
-            )
-        );
+        $response->setContent("<?xml version='1.0' encoding='ISO-8859-1'?><response><status>ERROR</status><mensagem>Chave inválida</mensagem></response>");
     }
     return $response;
 });
@@ -173,6 +162,7 @@ $app->get('/product/{key}/{codigo}',function($key,$codigo) use($app,$di){
 // Retorna a quantidade de produtos criados
 $app->post('/create/product/{key}', function ($key) use ($app,$di) {
     $response = new Response();
+    $response->setHeader('Content-Type', 'application/xml');
     $conta = Contas::findFirst(array('conditions' => array('key' => $key)));
     if($conta){
         $xml = simplexml_load_string($_POST['xml']);
@@ -187,23 +177,11 @@ $app->post('/create/product/{key}', function ($key) use ($app,$di) {
                 $total += 1;
             }
         }
-        $retorno['status'] = 'OK';
-        $retorno['response'] = array('Foram criados '.$total.' produtos de um total de '.count($xml).' de produtos enviados');
-        if(!empty($erros)){
-            $retorno['erros'] = $erros;
-        }
         $response->setStatusCode(201, 'Created');
-        $response->setJsonContent(
-           $retorno
-        );
+        $response->setContent("<?xml version='1.0' encoding='ISO-8859-1'?><response><status>OK</status><mensagem>Foram criados $total produtos de um total de count($xml) de produtos enviados</mensagem></response>");
     }else{
         $response->setStatusCode(401, 'Não autorizado');
-        $response->setJsonContent(
-            array(
-                'status' => 'Error',
-                'response'   => array('Chave invalida'),
-            )
-        );
+        $response->setContent("<?xml version='1.0' encoding='ISO-8859-1'?><response><status>ERROR</status><mensagem>Chave inválida</mensagem></response>");
     }
     return $response;
 });
@@ -218,27 +196,17 @@ $app->post('/create/account', function () use ($app) {
     $user->host = $app->request->getPost('host');
     $user->database = $app->request->getPost('database');
     $response = new Response();
+    $response->setHeader('Content-Type', 'application/xml');
     if($user->save()){
         $response->setStatusCode(201, 'Created');
-        $response->setJsonContent(
-            array(
-                'status' => 'OK',
-                'response'   => $user->key,
-            )
-        );
+        $response->setContent("<?xml version='1.0' encoding='ISO-8859-1'?><response><status>OK</status><mensagem>{$user->key}</mensagem></response>");
     }else{
         $response->setStatusCode(400, 'Invalid Request');
         $errors = array();
         foreach ($user->getMessages() as $message) {
             $errors[] = $message->getMessage();
         }
-
-        $response->setJsonContent(
-            array(
-                'status' => 'Error',
-                'response'   => $erros,
-            )
-        );
+        $response->setContent("<?xml version='1.0' encoding='ISO-8859-1'?><response><status>ERROR</status><mensagem>{$errors[0]}</mensagem></response>");
     }
     return $response;
 });
@@ -258,44 +226,23 @@ $app->post('/update/product/{key}/{codigo}', function ($key,$codigo) use ($app,$
             $produto->estoque = intval($xml->estoque);
             $produto->valor = floatval($xml->valor);
             if($produto->save()){
-                $response->setStatusCode(201, 'Created');
-                $response->setJsonContent(
-                    array(
-                        'status' => 'OK',
-                        'response'   => array('Produto alterado com sucesso'),
-                    )
-                );
+                $response->setStatusCode(200, 'OK');
+                $response->setContent("<?xml version='1.0' encoding='ISO-8859-1'?><response><status>OK</status><mensagem>Produto $codigo alteraco com sucesso</mensagem></response>");
             }else{
                 $response->setStatusCode(400, 'Invalid Request');
                 $errors = array();
                 foreach ($produto->getMessages() as $message) {
                     $errors[] = $message->getMessage();
                 }
-
-                $response->setJsonContent(
-                    array(
-                        'status' => 'Error',
-                        'response'   => $erros,
-                    )
-                );
+                $response->setContent("<?xml version='1.0' encoding='ISO-8859-1'?><response><status>ERROR</status><mensagem>{$errors[0]}</mensagem></response>");
             }
         }else{
             $response->setStatusCode(200, 'OK');
-            $response->setJsonContent(
-                array(
-                    'status' => 'Error',
-                    'response'   => array('Nenhum produto encontrado'),
-                )
-            );  
+            $response->setContent("<?xml version='1.0' encoding='ISO-8859-1'?><response><status>ERROR</status><mensagem>Produto $codigo não encontrodo</mensagem></response>");
         }
     }else{
         $response->setStatusCode(401, 'Não autorizado');
-        $response->setJsonContent(
-            array(
-                'status' => 'Error',
-                'response'   => array('Chave invalida'),
-            )
-        );
+        $response->setContent("<?xml version='1.0' encoding='ISO-8859-1'?><response><status>ERROR</status><mensagem>Chave inválida</mensagem></response>");
     }
     return $response;
 });
