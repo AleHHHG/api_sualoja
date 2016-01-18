@@ -18,11 +18,9 @@ $loader->registerDirs(
     )
 )->register();
 
-
 $di->set('collectionManager', function(){
     return new Phalcon\Mvc\Collection\Manager();
 }, true);
-
 
 $di->set(
     'api_contas',
@@ -33,7 +31,6 @@ $di->set(
     },
     true
 );
-
 
 function setDatabase($di,$host,$db){ 
     $di->set(
@@ -74,9 +71,30 @@ function setProduto($obj){
     }
 }
 
+function setCategoria($obj){ 
+    $c = new Categorias;
+    $c->sku = (string) $obj->codigo;
+    $c->nome = (string) $obj->nome;
+    $c->parent = (string) $obj->parent;
+    $erros = array();
+    if(!$c->save()){
+        $erros['codigo_produto'] = $obj->codigo;
+        foreach ($user->getMessages() as $message) {
+            $erros['mensagem'][] = $message->getMessage();
+        }
+        return $erros;
+    }else{
+        return true;
+    }
+}
+
 $app->get('/', function () {
     echo "<h1>Api Sualoja.online!</h1>";
 });
+
+##################################################
+####### PRODUTOS
+###################################################
 
 // Retorna todos os produtos cadastrados na loja
 $app->get('/products/{key}',function($key) use($app,$di){
@@ -116,8 +134,7 @@ $app->get('/products/{key}',function($key) use($app,$di){
     return $response;
 });
 
-
-// Retorna um produto especifo cadastrado na loja
+// Retorna um produto especifico cadastrado na loja
 $app->get('/product/{key}/{codigo}',function($key,$codigo) use($app,$di){
     $response = new Response();
     $response->setHeader('Content-Type', 'application/xml');
@@ -179,7 +196,7 @@ $app->post('/create/products/{key}', function ($key) use ($app,$di) {
             }
         }
         $response->setStatusCode(201, 'Created');
-        $response->setContent("<?xml version='1.0' encoding='ISO-8859-1'?><response><status>OK</status><mensagem>Foram criados $total produtos de um total de count($xml) de produtos enviados</mensagem></response>");
+        $response->setContent("<?xml version='1.0' encoding='ISO-8859-1'?><response><status>OK</status><mensagem>Foram criados $total produtos de um total de ".count($xml)." de produtos enviados</mensagem></response>");
     }else{
         $response->setStatusCode(401, 'Não autorizado');
         $response->setContent("<?xml version='1.0' encoding='ISO-8859-1'?><response><status>ERROR</status><mensagem>Chave inválida</mensagem></response>");
@@ -187,32 +204,7 @@ $app->post('/create/products/{key}', function ($key) use ($app,$di) {
     return $response;
 });
 
-
-//Metodo responsavel por criar a conta para o usuario.
-// Retorna a chave de acesso
-$app->post('/create/account', function () use ($app) {
-    $user = new Contas;
-    $user->responsavel = $app->request->getPost('responsavel');
-    $user->cliente = $app->request->getPost('cliente');
-    $user->host = $app->request->getPost('host');
-    $user->database = $app->request->getPost('database');
-    $response = new Response();
-    $response->setHeader('Content-Type', 'application/xml');
-    if($user->save()){
-        $response->setStatusCode(201, 'Created');
-        $response->setContent("<?xml version='1.0' encoding='ISO-8859-1'?><response><status>OK</status><mensagem>{$user->key}</mensagem></response>");
-    }else{
-        $response->setStatusCode(400, 'Invalid Request');
-        $errors = array();
-        foreach ($user->getMessages() as $message) {
-            $errors[] = $message->getMessage();
-        }
-        $response->setContent("<?xml version='1.0' encoding='ISO-8859-1'?><response><status>ERROR</status><mensagem>{$errors[0]}</mensagem></response>");
-    }
-    return $response;
-});
-
-// Update Product
+// Update produto
 $app->post('/update/product/{key}/{codigo}', function ($key,$codigo) use ($app,$di) {
     $response = new Response();
     $conta = Contas::findFirst(array('conditions' => array('key' => $key)));
@@ -240,7 +232,7 @@ $app->post('/update/product/{key}/{codigo}', function ($key,$codigo) use ($app,$
             }
         }else{
             $response->setStatusCode(200, 'OK');
-            $response->setContent("<?xml version='1.0' encoding='ISO-8859-1'?><response><status>ERROR</status><mensagem>Produto $codigo não encontrodo</mensagem></response>");
+            $response->setContent("<?xml version='1.0' encoding='ISO-8859-1'?><response><status>ERROR</status><mensagem>Produto $codigo não encontrado</mensagem></response>");
         }
     }else{
         $response->setStatusCode(401, 'Não autorizado');
@@ -249,10 +241,168 @@ $app->post('/update/product/{key}/{codigo}', function ($key,$codigo) use ($app,$
     return $response;
 });
 
+###################################################
+####### Categorias
+###################################################
 
+// Retorna todos os produtos cadastrados na loja
+$app->get('/categories/{key}',function($key) use($app,$di){
+    $response = new Response();
+    $response->setHeader('Content-Type', 'application/xml');
+    $conta = Contas::findFirst(array('conditions' => array('key' => $key)));
+    if($conta){
+        setDatabase($di,$conta->host,$conta->database);
+        $dados = Categorias::find();
+        $xml = new SimpleXMLElement("<?xml version='1.0' encoding='ISO-8859-1'?><response/>");
+        $xml->addChild('status','OK');
+        $categorias = $xml->addChild('categorias');
+        foreach ($dados as $key => $value) {
+            $categoria = $categorias->addChild('categoria');
+            $categoria->addChild('codigo',$value->sku);
+            $categoria->addChild('nome',$value->nome);
+            $categoria->addChild('parent',$value->parent);
+        }
+        $response->setStatusCode(200, 'OK');
+        $response->setContent($xml->asXml());
+    }else{
+        $response->setStatusCode(401, 'Não autorizado');
+        $response->setContent("<?xml version='1.0' encoding='ISO-8859-1'?><response><status>ERROR</status><mensagem>Chave inválida</mensagem></response>");
+    }
+    return $response;
+});
+
+// Retorna uma categoria especifica cadastrado na loja
+$app->get('/category/{key}/{codigo}',function($key,$codigo) use($app,$di){
+    $response = new Response();
+    $response->setHeader('Content-Type', 'application/xml');
+    $conta = Contas::findFirst(array('conditions' => array('key' => $key)));
+    if($conta){
+        setDatabase($di,$conta->host,$conta->database);
+        $dados = Categorias::findFirst(
+            array(
+                'conditions' => array('sku' => $codigo)
+                )
+            );
+        if($dados){
+            $xml = new SimpleXMLElement("<?xml version='1.0' encoding='ISO-8859-1'?> <response/>");
+            $xml->addChild('status','OK');
+            $xml->addChild('codigo',$dados->sku);
+            $xml->addChild('nome',$dados->nome);
+            $xml->addChild('parent',$dados->parent);
+            $response->setStatusCode(200, 'OK');
+            $response->setContent($xml->asXml());
+        }else{
+            $response->setStatusCode(200, 'OK');
+            $response->setContent("<?xml version='1.0' encoding='ISO-8859-1'?><response><status>ERROR</status><mensagem>Categoria cod. $codigo não encontrado</mensagem></response>");
+        }
+    }else{
+        $response->setStatusCode(401, 'Não autorizado');
+        $response->setContent("<?xml version='1.0' encoding='ISO-8859-1'?><response><status>ERROR</status><mensagem>Chave inválida</mensagem></response>");
+    }
+    return $response;
+});
+
+// Metodo responsavel por validar o usuario e salvar as categorias;
+// Retorna a quantidade de categoria criados
+$app->post('/create/categories/{key}', function ($key) use ($app,$di) {
+    $response = new Response();
+    $response->setHeader('Content-Type', 'application/xml');
+    $conta = Contas::findFirst(array('conditions' => array('key' => $key)));
+    if($conta){
+        $xml = simplexml_load_string($_POST['xml']);
+        setDatabase($di,$conta->host,$conta->database);
+        $erros = array();
+        $total = 0;
+        foreach ($xml->categoria as $key => $value) {
+            $status = setCategoria($value);
+            if(!$status){
+                $erros[] = $status;
+            }else{
+                $total += 1;
+            }
+        }
+        $response->setStatusCode(201, 'Created');
+        $response->setContent("<?xml version='1.0' encoding='ISO-8859-1'?><response><status>OK</status><mensagem>Foram criadas $total categorias de um total de ".count($xml)." de produtos enviados</mensagem></response>");
+    }else{
+        $response->setStatusCode(401, 'Não autorizado');
+        $response->setContent("<?xml version='1.0' encoding='ISO-8859-1'?><response><status>ERROR</status><mensagem>Chave inválida</mensagem></response>");
+    }
+    return $response;
+});
+
+// Update produto
+$app->post('/update/category/{key}/{codigo}', function ($key,$codigo) use ($app,$di) {
+    $response = new Response();
+    $conta = Contas::findFirst(array('conditions' => array('key' => $key)));
+    if($conta){
+        setDatabase($di,$conta->host,$conta->database);
+        $produto = Produtos::findFirst(
+            array(
+                'conditions' => array('sku' => $codigo)
+                )
+            );
+        if($produto){
+            $xml = simplexml_load_string($_POST['xml']);
+            $produto->nome = $xml->nome;
+            $produto->parent = $xml->parent;
+            if($produto->save()){
+                $response->setStatusCode(200, 'OK');
+                $response->setContent("<?xml version='1.0' encoding='ISO-8859-1'?><response><status>OK</status><mensagem>Produto $codigo alterado com sucesso</mensagem></response>");
+            }else{
+                $response->setStatusCode(400, 'Invalid Request');
+                $errors = array();
+                foreach ($produto->getMessages() as $message) {
+                    $errors[] = $message->getMessage();
+                }
+                $response->setContent("<?xml version='1.0' encoding='ISO-8859-1'?><response><status>ERROR</status><mensagem>{$errors[0]}</mensagem></response>");
+            }
+        }else{
+            $response->setStatusCode(200, 'OK');
+            $response->setContent("<?xml version='1.0' encoding='ISO-8859-1'?><response><status>ERROR</status><mensagem>Categoria $codigo não encontrada</mensagem></response>");
+        }
+    }else{
+        $response->setStatusCode(401, 'Não autorizado');
+        $response->setContent("<?xml version='1.0' encoding='ISO-8859-1'?><response><status>ERROR</status><mensagem>Chave inválida</mensagem></response>");
+    }
+    return $response;
+});
+
+###################################################
+####### CRIAÇÃO DO ACESSO
+###################################################
+
+// Cria o usuario e retorna a chave de acesso.
+$app->post('/create/account', function () use ($app) {
+    $user = new Contas;
+    $user->responsavel = $app->request->getPost('responsavel');
+    $user->cliente = $app->request->getPost('cliente');
+    $user->host = $app->request->getPost('host');
+    $user->database = $app->request->getPost('database');
+    $response = new Response();
+    $response->setHeader('Content-Type', 'application/xml');
+    if($user->save()){
+        $response->setStatusCode(201, 'Created');
+        $response->setContent("<?xml version='1.0' encoding='ISO-8859-1'?><response><status>OK</status><mensagem>{$user->key}</mensagem></response>");
+    }else{
+        $response->setStatusCode(400, 'Invalid Request');
+        $errors = array();
+        foreach ($user->getMessages() as $message) {
+            $errors[] = $message->getMessage();
+        }
+        $response->setContent("<?xml version='1.0' encoding='ISO-8859-1'?><response><status>ERROR</status><mensagem>{$errors[0]}</mensagem></response>");
+    }
+    return $response;
+});
+
+##################################################
+####### NOT FOUND
+##################################################
+
+// Caso a url acessada não existe retorna uma mensagem de erro.
 $app->notFound(function () use ($app) {
-	$app->response->setStatusCode(404, 'Not Found')->sendHeaders();
-	echo 'Pagina não encontrada';
+    $response = new Response();
+    $response->setStatusCode(404, 'Not Found');
+    $response->setContent("<?xml version='1.0' encoding='ISO-8859-1'?><response><status>ERROR</status><mensagem>Requisição inválida, m´dtodo não encontrado </mensagem></response>");
 });
 
 $app->handle();
