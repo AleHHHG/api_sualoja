@@ -88,8 +88,9 @@ $app->get('/products/{key}',function($key) use($app,$di){
         $dados = Produtos::find();
         $xml = new SimpleXMLElement("<?xml version='1.0' encoding='ISO-8859-1'?><response/>");
         $xml->addChild('status','OK');
+        $produtos = $xml->addChild('produtos');
         foreach ($dados as $key => $value) {
-            $produto = $xml->addChild('produtos');
+            $produto = $produtos->addChild('produto');
             $produto->addChild('codigo',$value->sku);
             $produto->addChild('nome',$value->nome);
             $produto->addChild('categoria',$value->categoria);
