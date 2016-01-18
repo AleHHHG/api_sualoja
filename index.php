@@ -161,7 +161,7 @@ $app->get('/product/{key}/{codigo}',function($key,$codigo) use($app,$di){
 
 // Metodo responsavel por validar o usuario e salvar o produto;
 // Retorna a quantidade de produtos criados
-$app->post('/create/product/{key}', function ($key) use ($app,$di) {
+$app->post('/create/products/{key}', function ($key) use ($app,$di) {
     $response = new Response();
     $response->setHeader('Content-Type', 'application/xml');
     $conta = Contas::findFirst(array('conditions' => array('key' => $key)));
