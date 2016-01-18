@@ -224,6 +224,7 @@ $app->post('/update/product/{key}/{codigo}', function ($key,$codigo) use ($app,$
                 )
             );
         if($produto){
+            $xml = simplexml_load_string($_POST['xml']);
             $produto->estoque = intval($xml->estoque);
             $produto->valor = floatval($xml->valor);
             if($produto->save()){
