@@ -228,7 +228,7 @@ $app->post('/update/product/{key}/{codigo}', function ($key,$codigo) use ($app,$
             $produto->valor = floatval($xml->valor);
             if($produto->save()){
                 $response->setStatusCode(200, 'OK');
-                $response->setContent("<?xml version='1.0' encoding='ISO-8859-1'?><response><status>OK</status><mensagem>Produto $codigo alteraco com sucesso</mensagem></response>");
+                $response->setContent("<?xml version='1.0' encoding='ISO-8859-1'?><response><status>OK</status><mensagem>Produto $codigo alterado com sucesso</mensagem></response>");
             }else{
                 $response->setStatusCode(400, 'Invalid Request');
                 $errors = array();
