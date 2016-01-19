@@ -260,7 +260,7 @@ $app->get('/categories/{key}',function($key) use($app,$di){
             $categoria = $categorias->addChild('categoria');
             $categoria->addChild('codigo',$value->sku);
             $categoria->addChild('nome',$value->nome);
-            $categoria->addChild('parent',$value->parent);
+            $categoria->addChild('parent',$value->parent_sku);
         }
         $response->setStatusCode(200, 'OK');
         $response->setContent($xml->asXml());
@@ -288,7 +288,7 @@ $app->get('/category/{key}/{codigo}',function($key,$codigo) use($app,$di){
             $xml->addChild('status','OK');
             $xml->addChild('codigo',$dados->sku);
             $xml->addChild('nome',$dados->nome);
-            $xml->addChild('parent',$dados->parent);
+            $xml->addChild('parent',$dados->parent_sku);
             $response->setStatusCode(200, 'OK');
             $response->setContent($xml->asXml());
         }else{
@@ -330,28 +330,27 @@ $app->post('/create/categories/{key}', function ($key) use ($app,$di) {
     return $response;
 });
 
-// Update produto
+// Update Categoria
 $app->post('/update/category/{key}/{codigo}', function ($key,$codigo) use ($app,$di) {
     $response = new Response();
     $conta = Contas::findFirst(array('conditions' => array('key' => $key)));
     if($conta){
         setDatabase($di,$conta->host,$conta->database);
-        $produto = Produtos::findFirst(
+        $categoria = Categorias::findFirst(
             array(
                 'conditions' => array('sku' => $codigo)
                 )
             );
-        if($produto){
+        if($categoria){
             $xml = simplexml_load_string($_POST['xml']);
-            $produto->nome = $xml->nome;
-            $produto->parent = $xml->parent;
-            if($produto->save()){
+            $categoria->nome = (string) $xml->nome;
+            if($categoria->save()){
                 $response->setStatusCode(200, 'OK');
-                $response->setContent("<?xml version='1.0' encoding='ISO-8859-1'?><response><status>OK</status><mensagem>Produto $codigo alterado com sucesso</mensagem></response>");
+                $response->setContent("<?xml version='1.0' encoding='ISO-8859-1'?><response><status>OK</status><mensagem>Categoria $codigo alterada com sucesso</mensagem></response>");
             }else{
                 $response->setStatusCode(400, 'Invalid Request');
                 $errors = array();
-                foreach ($produto->getMessages() as $message) {
+                foreach ($categoria->getMessages() as $message) {
                     $errors[] = $message->getMessage();
                 }
                 $response->setContent("<?xml version='1.0' encoding='ISO-8859-1'?><response><status>ERROR</status><mensagem>{$errors[0]}</mensagem></response>");
