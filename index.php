@@ -402,6 +402,7 @@ $app->notFound(function () use ($app) {
     $response = new Response();
     $response->setStatusCode(404, 'Not Found');
     $response->setContent("<?xml version='1.0' encoding='ISO-8859-1'?><response><status>ERROR</status><mensagem>Requisição inválida, m´dtodo não encontrado </mensagem></response>");
+    return $response;
 });
 
 $app->handle();
