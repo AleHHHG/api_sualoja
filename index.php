@@ -75,7 +75,7 @@ function setCategoria($obj){
     $c = new Categorias;
     $c->sku = (string) $obj->codigo;
     $c->nome = (string) $obj->nome;
-    $c->parent = (string) $obj->parent;
+    $c->parent_sku = (string) $obj->parent;
     $erros = array();
     if(!$c->save()){
         $erros['codigo_produto'] = $obj->codigo;
