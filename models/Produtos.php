@@ -18,6 +18,18 @@ class Produtos extends \Phalcon\Mvc\Collection
         $this->setConnectionService('api_db');
     }
 
+    public function beforeSave()
+    {   
+        $categoria = Categorias::findFirst(array(
+            'conditions' => array(
+                'sku' => $this->categoria
+            )
+        ));
+        if($categoria){
+            $this->categoria = (string)$categoria->_id;
+        }
+    }
+
 
     public function getSource()
     {

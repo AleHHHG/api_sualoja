@@ -26,7 +26,6 @@ $di->set(
     'api_contas',
     function () {
         $mongo = new MongoClient("mongodb://localhost");
-
         return $mongo->selectDB("api_contas");
     },
     true
@@ -51,8 +50,17 @@ function setProduto($obj){
     $p->categoria = (string) $obj->categoria;
     $p->destaque = (string) $obj->destaque;
     $p->ativo = (string) $obj->ativo;
-    $p->valor = floatval($obj->valor);
-    $p->estoque = intval($obj->estoque);
+    if(!isset($obj->detalhes)){
+        $p->valor = floatval($obj->valor);
+        $p->estoque = intval($obj->estoque);
+    }else{
+        foreach ($obj->detalhes->detalhe as $key => $value) {
+             $p->detalhes[] = $value;
+        }
+        foreach ($p->detalhes as $key => $value) {
+            $value->detalhe_id = (string) new MongoId();
+        }
+    }
     $p->resumo = (string) $obj->resumo;
     $p->descricao = (string) $obj->descricao;
     $p->peso = (string) $obj->cubagem->peso;
@@ -149,20 +157,20 @@ $app->get('/product/{key}/{codigo}',function($key,$codigo) use($app,$di){
         if($dados){
             $xml = new SimpleXMLElement("<?xml version='1.0' encoding='ISO-8859-1'?> <response/>");
             $xml->addChild('status','OK');
-            $xml->addChild('codigo',$dados->sku);
-            $xml->addChild('nome',$dados->nome);
-            $xml->addChild('categoria',$dados->categoria);
-            $xml->addChild('valor',$dados->valor);
-            $xml->addChild('destaque',$dados->destaque);
-            $xml->addChild('ativo',$dados->ativo);
-            $xml->addChild('estoque',$dados->estoque);
-            $xml->addChild('resumo',$dados->resumo);
-            $xml->addChild('descricao',$dados->descricao);
+            $xml->addChild('codigo',(string)$dados->sku);
+            $xml->addChild('nome',(string)$dados->nome);
+            $xml->addChild('categoria',(string)$dados->categoria);
+            $xml->addChild('valor',floatval($dados->valor));
+            $xml->addChild('destaque',intval($dados->destaque));
+            $xml->addChild('ativo',(string)$dados->ativo);
+            $xml->addChild('estoque',(string)$dados->estoque);
+            $xml->addChild('resumo',(string)$dados->resumo);
+            $xml->addChild('descricao',(string)$dados->descricao);
             $cubagem = $xml->addChild('cubagem');
-            $cubagem->addChild('peso',$dados->peso);
-            $cubagem->addChild('altura',$dados->altura);
-            $cubagem->addChild('largura',$dados->largura);
-            $cubagem->addChild('comprimento',$dados->comprimento);
+            $cubagem->addChild('peso',(string)$dados->peso);
+            $cubagem->addChild('altura',(string)$dados->altura);
+            $cubagem->addChild('largura',(string)$dados->largura);
+            $cubagem->addChild('comprimento',(string)$dados->comprimento);
             $response->setStatusCode(200, 'OK');
             $response->setContent($xml->asXml());
         }else{
@@ -217,8 +225,25 @@ $app->post('/update/product/{key}/{codigo}', function ($key,$codigo) use ($app,$
             );
         if($produto){
             $xml = simplexml_load_string($_POST['xml']);
-            $produto->estoque = intval($xml->estoque);
-            $produto->valor = floatval($xml->valor);
+            if(!isset($xml->detalhe)){
+                $produto->estoque = intval($xml->estoque);
+                $produto->valor = floatval($xml->valor);
+            }else{
+                $chave = null;
+                foreach ($produto->detalhes as $key => $value) {
+                    if($value['codigo'] == $xml->detalhe->codigo){
+                        $chave = $key;
+                    }
+                }
+                if(!is_null($chave)){
+                    $produto->detalhes[$chave]['estoque'] = intval($xml->detalhe->estoque);
+                    $produto->detalhes[$chave]['valor'] = floatval($xml->detalhe->valor);
+                }else{
+                    $response->setStatusCode(400, 'Invalid Request');
+                    $response->setContent("<?xml version='1.0' encoding='ISO-8859-1'?><response><status>ERROR</status><mensagem>Detalhe não encontrado</mensagem></response>");
+                    return $response;
+                }
+            }
             if($produto->save()){
                 $response->setStatusCode(200, 'OK');
                 $response->setContent("<?xml version='1.0' encoding='ISO-8859-1'?><response><status>OK</status><mensagem>Produto $codigo alterado com sucesso</mensagem></response>");
